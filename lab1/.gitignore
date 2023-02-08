@@ -1,3 +1,4 @@
 tests/
 *.o
 coro_sort
+sort_result.txt

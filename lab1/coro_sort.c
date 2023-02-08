@@ -10,8 +10,9 @@ typedef struct file_sorter {
     int sz;
 } file_sorter_t;
 
-#define GETBIT(n, k) (n & (1 << k)) >> k 
+#define DEFINE_FILE_SORTER(name) (file_sorter_t) {.filename=name, .arr=NULL, .sz=0}
 
+#define GETBIT(n, k) (n & (1 << k)) >> k 
 
 // Radix Sort
 // Time Complexity: O(n)
@@ -62,11 +63,58 @@ int sort_file(void *data) {
 }
 
 int main(int argc, char *argv[]){
-    file_sorter_t test = {.filename="tests/test1.txt"};
-    sort_file(&test);
-
-    // printf("%d\n%d\n%d\n", test.sz, test.arr[0], test.arr[test.sz - 1]);
-    for (int i = 0; i < test.sz; ++i) {
-        printf("%d ", test.arr[i]);
+    if (argc < 4) {
+        fprintf(stderr, "Usage: %s LATENCY COROUTINES FILE...\n", argv[0]);
+        exit(1);
     }
+
+    int latency;
+    if (!sscanf(argv[1], "%d", &latency) || latency <= 0) {
+        fprintf(stderr, "LATENCY should be natural number\n");
+        exit(1);
+    }
+
+    int num_cor;
+    if (!sscanf(argv[2], "%d", &num_cor) || num_cor <= 0) {
+        fprintf(stderr, "COROUTINES should be natural number\n");
+        exit(1);
+    }
+
+    int num_files = argc - 3;
+    file_sorter_t *sorters = (file_sorter_t *) malloc(sizeof(file_sorter_t) * num_files);
+
+    for (int i = 3; i < argc; ++i)
+        sorters[i - 3] = DEFINE_FILE_SORTER(argv[i]);
+
+
+    for (int i = 0; i < num_files; ++i) {
+        sort_file(&sorters[i]);
+    }
+
+    // merge sorted arrays and write to file
+    FILE *out = fopen("sort_result.txt", "w");
+
+    int *off = (int *) malloc(sizeof(int) * num_files);
+    memset(off, 0, sizeof(int) * num_files);
+
+    int final_size = 0;
+    for (int i = 0; i < num_files; ++i)
+        final_size += sorters[i].sz;
+
+    for (int i = 0; i < final_size; ++i) {
+        int idx = -1;
+
+        for (int j = 0; j < num_files; ++j) {
+            if (sorters[j].sz == off[j]) continue;
+
+            if (idx == -1 || sorters[j].arr[off[j]] < sorters[idx].arr[off[idx]])
+                idx = j;
+        }
+
+        fprintf(out, "%d ", sorters[idx].arr[off[idx]++]);
+    }
+
+    free(off);
+    free(sorters);
+    fclose(out);
 }
