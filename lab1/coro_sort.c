@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/time.h>
 
 #include "libcoro.h"
 
@@ -8,16 +9,47 @@ typedef struct file_sorter {
     char *filename;
     int *arr;
     int sz;
+
+    // timestamp from last yield
+    long yield_ts;
 } file_sorter_t;
 
-#define DEFINE_FILE_SORTER(name) (file_sorter_t) {.filename=name, .arr=NULL, .sz=0}
+typedef struct coro_pool {
+    file_sorter_t *queue;
+    int qsize;
+    int qnext;
+} coro_pool_t;
 
-#define GETBIT(n, k) (n & (1 << k)) >> k 
+typedef struct coro_worker {
+    coro_pool_t *pool;
+    int wid;
+} coro_worker_t;
+
+int QUANTUM;
+
+// nashel na githabe
+// https://gist.github.com/w1k1n9cc/012be60361e73de86bee0bce51652aa7
+long microtime() {
+	struct timeval currentTime;
+	gettimeofday(&currentTime, NULL);
+	return currentTime.tv_sec * (int)1e6 + currentTime.tv_usec;
+}
+
+#define DEFINE_FILE_SORTER(name) (file_sorter_t) {.filename=name, .arr=NULL, .sz=0, .yield_ts=microtime()}
+#define DEFINE_CORO_POOL(q, sz) (coro_pool_t) {.queue=q, .qsize=sz, .qnext=0}
+
+#define GETBIT(n, k) (n & (1 << k)) >> k
+
+#define MIN(a, b) (a < b ? a : b)
+#define MAX(a, b) (a < b ? b : a)
+
 
 // Radix Sort
 // Time Complexity: O(n)
 // Memory Complexity O(n)
-void radix_sort_coro(int *orig, int arr_size, const char *coro_name) {
+void radix_sort_coro(file_sorter_t *sorter) {
+    int *orig = sorter->arr;
+    int arr_size = sorter->sz;
     struct coro *this = coro_this();
 
     int *radix[2] = {
@@ -41,21 +73,29 @@ void radix_sort_coro(int *orig, int arr_size, const char *coro_name) {
             sz[j] = 0;
         }
 
-        printf("\n%s: switch count %lld\n", coro_name, coro_switch_count(this));
-	    printf("%s: yield\n", coro_name);
-        coro_yield();
+        printf("\n%s: switch count %lld\n", sorter->filename, coro_switch_count(this));
+        long ts = microtime();
+
+        if (ts - sorter->yield_ts >= QUANTUM){    
+	        printf("%s: quantum has last (%ld mc): yield\n", sorter->filename, ts - sorter->yield_ts);
+            coro_yield();
+            sorter->yield_ts = microtime();
+        } else {
+            printf("%s: quantum did not last yet (%ld mc): continue\n", sorter->filename, ts - sorter->yield_ts);
+        }
     }
+
+    printf("%s: sort finished\n", sorter->filename);
 
     free(radix[0]);
     free(radix[1]);
 }
 
+
 int sort_file(void *data) {
-    struct coro *this = coro_this();
     file_sorter_t *sorter = (file_sorter_t *) data;
 
-    printf("\nStarted coroutine %s\n", sorter->filename);
-	printf("%s: switch count %lld\n", sorter->filename, coro_switch_count(this));
+    printf("Sorting %s\n", sorter->filename);
 
     FILE *f = fopen(sorter->filename, "r");
     
@@ -69,8 +109,50 @@ int sort_file(void *data) {
         sorter->arr[sorter->sz - 1] = next;
     }
 
-    radix_sort_coro(sorter->arr, sorter->sz, sorter->filename);
+    radix_sort_coro(sorter);
 }
+
+
+int coro_worker_f(void *data) {
+    coro_worker_t *worker = (coro_worker_t*) data;
+
+    printf("Started worker #%d\n", worker->wid);
+
+    while (worker->pool->qnext < worker->pool->qsize) {
+        file_sorter_t *queue = worker->pool->queue;
+        printf("Worker #%d: picked %s\n", worker->wid, queue[worker->pool->qnext].filename);
+        int this_sorter = worker->pool->qnext++;
+        coro_yield();
+        sort_file(&queue[this_sorter]);
+        printf("Worker #%d: sorted %s\n", worker->wid, queue[this_sorter].filename);
+    }
+
+    printf("Finished worker #%d\n", worker->wid);
+    return 0;
+}
+
+
+void coro_pool_f(int pool_size, file_sorter_t *queue, int qsize) {
+    // run `pool_size` coroutines
+    coro_pool_t shared_pool = DEFINE_CORO_POOL(queue, qsize);
+
+    int num_workers = MIN(pool_size, qsize);
+    coro_worker_t *workers = (coro_worker_t *) malloc(sizeof(coro_worker_t) * num_workers);
+
+    for (int i = 0; i < num_workers; ++i) {
+        workers[i] = (coro_worker_t) {.pool=&shared_pool, .wid=i + 1};
+        coro_new(coro_worker_f, (void*) &workers[i]);
+    }
+
+    struct coro *c;
+    while ((c = coro_sched_wait()) != NULL) {
+        printf("Finished %d\n", coro_status(c));
+        coro_delete(c);
+    }
+
+    free(workers);
+}
+
 
 int main(int argc, char *argv[]){
     if (argc < 4) {
@@ -95,21 +177,15 @@ int main(int argc, char *argv[]){
     int num_files = argc - 3;
     file_sorter_t *sorters = (file_sorter_t *) malloc(sizeof(file_sorter_t) * num_files);
 
+    QUANTUM = latency / num_cor;
+
+    printf("quantum: %d\n", QUANTUM);
+
     for (int i = 3; i < argc; ++i)
         sorters[i - 3] = DEFINE_FILE_SORTER(argv[i]);
 
-
-    // create coroutines
-    for (int i = 0; i < num_files; ++i) {
-        coro_new(sort_file, &sorters[i]);
-    }
-
-    // wait for coroutines
-    struct coro *c;
-    while ((c = coro_sched_wait()) != NULL) {
-		printf("Finished %d\n", coro_status(c));
-		coro_delete(c);
-	}
+    // run pool of coroutines and complete sorting files separately
+    coro_pool_f(num_cor, sorters, num_files);
 
     // merge sorted arrays and write to file
     FILE *out = fopen("sort_result.txt", "w");
