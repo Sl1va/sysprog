@@ -9,6 +9,10 @@ coro_sort.o: coro_sort.c
 libcoro.o: libcoro.c libcoro.h
 	gcc -c libcoro.c -o libcoro.o
 
+test: coro_sort
+	./coro_sort 100 10 tests/*
+	python3 checker.py -f sort_result.txt
+
 clean:
 	rm *.o
 	rm coro_sort

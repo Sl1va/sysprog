@@ -17,7 +17,9 @@ typedef struct file_sorter {
 // Radix Sort
 // Time Complexity: O(n)
 // Memory Complexity O(n)
-void radix_sort(int *orig, int arr_size) {
+void radix_sort_coro(int *orig, int arr_size, const char *coro_name) {
+    struct coro *this = coro_this();
+
     int *radix[2] = {
         (int *)malloc(sizeof(int) * arr_size),
         (int *)malloc(sizeof(int) * arr_size)
@@ -38,6 +40,10 @@ void radix_sort(int *orig, int arr_size) {
             }
             sz[j] = 0;
         }
+
+        printf("\n%s: switch count %lld\n", coro_name, coro_switch_count(this));
+	    printf("%s: yield\n", coro_name);
+        coro_yield();
     }
 
     free(radix[0]);
@@ -45,7 +51,11 @@ void radix_sort(int *orig, int arr_size) {
 }
 
 int sort_file(void *data) {
+    struct coro *this = coro_this();
     file_sorter_t *sorter = (file_sorter_t *) data;
+
+    printf("\nStarted coroutine %s\n", sorter->filename);
+	printf("%s: switch count %lld\n", sorter->filename, coro_switch_count(this));
 
     FILE *f = fopen(sorter->filename, "r");
     
@@ -59,7 +69,7 @@ int sort_file(void *data) {
         sorter->arr[sorter->sz - 1] = next;
     }
 
-    radix_sort(sorter->arr, sorter->sz);
+    radix_sort_coro(sorter->arr, sorter->sz, sorter->filename);
 }
 
 int main(int argc, char *argv[]){
@@ -80,6 +90,8 @@ int main(int argc, char *argv[]){
         exit(1);
     }
 
+    coro_sched_init();
+
     int num_files = argc - 3;
     file_sorter_t *sorters = (file_sorter_t *) malloc(sizeof(file_sorter_t) * num_files);
 
@@ -87,9 +99,17 @@ int main(int argc, char *argv[]){
         sorters[i - 3] = DEFINE_FILE_SORTER(argv[i]);
 
 
+    // create coroutines
     for (int i = 0; i < num_files; ++i) {
-        sort_file(&sorters[i]);
+        coro_new(sort_file, &sorters[i]);
     }
+
+    // wait for coroutines
+    struct coro *c;
+    while ((c = coro_sched_wait()) != NULL) {
+		printf("Finished %d\n", coro_status(c));
+		coro_delete(c);
+	}
 
     // merge sorted arrays and write to file
     FILE *out = fopen("sort_result.txt", "w");
