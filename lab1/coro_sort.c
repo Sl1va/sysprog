@@ -1,7 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/time.h>
+#include <time.h>
+#include <inttypes.h>
 
 #include "libcoro.h"
 
@@ -11,7 +12,8 @@ typedef struct file_sorter {
     int sz;
 
     // timestamp from last yield
-    long yield_ts;
+    uint64_t yield_ts;
+    uint64_t total_time;
 } file_sorter_t;
 
 typedef struct coro_pool {
@@ -27,21 +29,27 @@ typedef struct coro_worker {
 
 int QUANTUM;
 
-// nashel na githabe
-// https://gist.github.com/w1k1n9cc/012be60361e73de86bee0bce51652aa7
-long microtime() {
-	struct timeval currentTime;
-	gettimeofday(&currentTime, NULL);
-	return currentTime.tv_sec * (int)1e6 + currentTime.tv_usec;
+uint64_t microtime() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    uint64_t uc = (uint64_t) ts.tv_sec * 1000000 + (uint64_t) ts.tv_nsec / 1000;
+    return uc;
 }
 
-#define DEFINE_FILE_SORTER(name) (file_sorter_t) {.filename=name, .arr=NULL, .sz=0, .yield_ts=microtime()}
+#define DEFINE_FILE_SORTER(name) (file_sorter_t) {.filename=name, .arr=NULL, .sz=0, .yield_ts=-1, .total_time=0}
 #define DEFINE_CORO_POOL(q, sz) (coro_pool_t) {.queue=q, .qsize=sz, .qnext=0}
 
 #define GETBIT(n, k) (n & (1 << k)) >> k
 
 #define MIN(a, b) (a < b ? a : b)
 #define MAX(a, b) (a < b ? b : a)
+
+#define YIELD_WITH_TIMER(sorter)                                    \
+    do {                                                            \
+        (sorter)->total_time += microtime() - (sorter)->yield_ts;   \
+        coro_yield();                                               \
+        (sorter)->yield_ts = microtime();                           \
+    } while (0)
 
 
 // Radix Sort
@@ -74,14 +82,15 @@ void radix_sort_coro(file_sorter_t *sorter) {
         }
 
         printf("\n%s: switch count %lld\n", sorter->filename, coro_switch_count(this));
-        long ts = microtime();
+        uint64_t ts = microtime();
+        if (sorter->yield_ts == -1)
+            sorter->yield_ts = ts;
 
         if (ts - sorter->yield_ts >= QUANTUM){    
-	        printf("%s: quantum has last (%ld mc): yield\n", sorter->filename, ts - sorter->yield_ts);
-            coro_yield();
-            sorter->yield_ts = microtime();
+	        printf("%s: quantum has last (%ld uc): yield\n", sorter->filename, ts - sorter->yield_ts);
+            YIELD_WITH_TIMER(sorter);
         } else {
-            printf("%s: quantum did not last yet (%ld mc): continue\n", sorter->filename, ts - sorter->yield_ts);
+            printf("%s: quantum did not last yet (%ld uc): continue\n", sorter->filename, ts - sorter->yield_ts);
         }
     }
 
@@ -110,18 +119,18 @@ int sort_file(void *data) {
     }
 
     radix_sort_coro(sorter);
+    
+    fclose(f);
+    return 0;
 }
-
 
 int coro_worker_f(void *data) {
     coro_worker_t *worker = (coro_worker_t*) data;
     struct coro *this = coro_this();
 
-    long time_start, time_stop;
-    time_start = microtime();
-
     printf("Started worker #%d\n", worker->wid);
 
+    uint64_t time_total = 0;
     while (worker->pool->qnext < worker->pool->qsize) {
         file_sorter_t *queue = worker->pool->queue;
         printf("Worker #%d: picked %s\n", worker->wid, queue[worker->pool->qnext].filename);
@@ -129,15 +138,13 @@ int coro_worker_f(void *data) {
         coro_yield();
         sort_file(&queue[this_sorter]);
         printf("Worker #%d: sorted %s\n", worker->wid, queue[this_sorter].filename);
-    }
 
-    time_stop = microtime();
+        time_total += queue[this_sorter].total_time;
+    }
 
     printf("Finished worker #%d\n", worker->wid);
     coro_yield();
-
-    int time_mc = time_stop - time_start;
-    printf("Worker #%d: uptime %d mc, %lld context switches\n", worker->wid, time_mc, coro_switch_count(this));
+    printf("Worker #%d: uptime %ld uc, %lld context switches\n", worker->wid, time_total, coro_switch_count(this));
 
     return 0;
 }
@@ -166,7 +173,7 @@ void coro_pool_f(int pool_size, file_sorter_t *queue, int qsize) {
 
 
 int main(int argc, char *argv[]){
-    int time_start, time_stop;
+    uint64_t time_start, time_stop;
     time_start = microtime();
 
     if (argc < 4) {
@@ -229,5 +236,5 @@ int main(int argc, char *argv[]){
     fclose(out);
 
     time_stop = microtime();
-    printf("Total execution time: %d mc\n", time_stop - time_start);
+    printf("Total execution time: %ld uc\n", time_stop - time_start);
 }
