@@ -115,6 +115,10 @@ int sort_file(void *data) {
 
 int coro_worker_f(void *data) {
     coro_worker_t *worker = (coro_worker_t*) data;
+    struct coro *this = coro_this();
+
+    long time_start, time_stop;
+    time_start = microtime();
 
     printf("Started worker #%d\n", worker->wid);
 
@@ -127,7 +131,14 @@ int coro_worker_f(void *data) {
         printf("Worker #%d: sorted %s\n", worker->wid, queue[this_sorter].filename);
     }
 
+    time_stop = microtime();
+
     printf("Finished worker #%d\n", worker->wid);
+    coro_yield();
+
+    int time_mc = time_stop - time_start;
+    printf("Worker #%d: uptime %d mc, %lld context switches\n", worker->wid, time_mc, coro_switch_count(this));
+
     return 0;
 }
 
@@ -146,7 +157,7 @@ void coro_pool_f(int pool_size, file_sorter_t *queue, int qsize) {
 
     struct coro *c;
     while ((c = coro_sched_wait()) != NULL) {
-        printf("Finished %d\n", coro_status(c));
+        // printf("Finished %d\n", coro_status(c));
         coro_delete(c);
     }
 
@@ -155,6 +166,9 @@ void coro_pool_f(int pool_size, file_sorter_t *queue, int qsize) {
 
 
 int main(int argc, char *argv[]){
+    int time_start, time_stop;
+    time_start = microtime();
+
     if (argc < 4) {
         fprintf(stderr, "Usage: %s LATENCY COROUTINES FILE...\n", argv[0]);
         exit(1);
@@ -213,4 +227,7 @@ int main(int argc, char *argv[]){
     free(off);
     free(sorters);
     fclose(out);
+
+    time_stop = microtime();
+    printf("Total execution time: %d mc\n", time_stop - time_start);
 }
