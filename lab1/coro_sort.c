@@ -32,8 +32,8 @@ int QUANTUM;
 uint64_t microtime() {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    uint64_t uc = (uint64_t) ts.tv_sec * 1000000 + (uint64_t) ts.tv_nsec / 1000;
-    return uc;
+    uint64_t us = (uint64_t) ts.tv_sec * 1000000 + (uint64_t) ts.tv_nsec / 1000;
+    return us;
 }
 
 #define DEFINE_FILE_SORTER(name) (file_sorter_t) {.filename=name, .arr=NULL, .sz=0, .yield_ts=-1, .total_time=0}
@@ -87,10 +87,10 @@ void radix_sort_coro(file_sorter_t *sorter) {
             sorter->yield_ts = ts;
 
         if (ts - sorter->yield_ts >= QUANTUM){    
-	        printf("%s: quantum has last (%ld uc): yield\n", sorter->filename, ts - sorter->yield_ts);
+	        printf("%s: quantum has last (%llu us): yield\n", sorter->filename, (long long) (ts - sorter->yield_ts));
             YIELD_WITH_TIMER(sorter);
         } else {
-            printf("%s: quantum did not last yet (%ld uc): continue\n", sorter->filename, ts - sorter->yield_ts);
+            printf("%s: quantum did not last yet (%llu us): continue\n", sorter->filename, (long long) (ts - sorter->yield_ts));
         }
     }
 
@@ -144,7 +144,7 @@ int coro_worker_f(void *data) {
 
     printf("Finished worker #%d\n", worker->wid);
     coro_yield();
-    printf("Worker #%d: uptime %ld uc, %lld context switches\n", worker->wid, time_total, coro_switch_count(this));
+    printf("Worker #%d: uptime %llu us, %lld context switches\n", worker->wid, (long long) time_total, coro_switch_count(this));
 
     return 0;
 }
@@ -236,5 +236,5 @@ int main(int argc, char *argv[]){
     fclose(out);
 
     time_stop = microtime();
-    printf("Total execution time: %ld uc\n", time_stop - time_start);
+    printf("Total execution time: %llu us\n", (long long) (time_stop - time_start));
 }
