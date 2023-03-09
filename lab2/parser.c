@@ -113,6 +113,11 @@ char **cmdline_tokens(const char *_cmdline, unsigned int size, int *num_tokens, 
         int transition;
         
         switch (cmdline[i]) {
+            case '#':
+                if (cur_state == S0) goto end;
+                transition = T_L;
+                break;
+
             case ' ':
             case '\t':
                 transition = T_D;
