@@ -14,6 +14,8 @@
 #define S5 5
 #define S6 6
 #define S7 7
+#define S8 8
+#define S9 9
 
 // define final states for FSA
 #define S_F 100 /* Flush */
@@ -26,6 +28,8 @@
 #define T_A 2 /* & */
 #define T_O 3 /* | */
 #define T_P 4 /* > */
+#define T_S 5 /* ' */
+#define T_Q 6 /* " */
 
 
 #define STRINIT(str, sz_ident)                                  \
@@ -70,15 +74,17 @@ char *read_cmdline(const char *invite, FILE *instream, FILE *outstream, unsigned
     }
 }
 
-int fsa[][5] = {
-    [S0] = {[T_L] = S1, [T_D] = S_D, [T_A] = S2, [T_O] = S4, [T_P] = S6},
-    [S1] = {[T_L] = S1, [T_D] = S_F, [T_A] = S_F, [T_O] = S_F, [T_P] = S_F},
-    [S2] = {[T_L] = S_F, [T_D] = S_F, [T_A] = S3, [T_O] = S_E, [T_P] = S_E},
-    [S3] = {[T_L] = S_F, [T_D] = S_F, [T_A] = S_E, [T_O] = S_E, [T_P] = S_E},
-    [S4] = {[T_L] = S_F, [T_D] = S_F, [T_A] = S_E, [T_O] = S5, [T_P] = S_E},
-    [S5] = {[T_L] = S_F, [T_D] = S_F, [T_A] = S_E, [T_O] = S_E, [T_P] = S_E},
-    [S6] = {[T_L] = S_F, [T_D] = S_F, [T_A] = S_E, [T_O] = S_E, [T_P] = S7},
-    [S7] = {[T_L] = S_F, [T_D] = S_F, [T_A] = S_E, [T_O] = S_E, [T_P] = S_E},
+int fsa[][7] = {
+    [S0] = {[T_L] = S1, [T_D] = S_D, [T_A] = S2, [T_O] = S4, [T_P] = S6, [T_S] = S8, [T_Q] = S9},
+    [S1] = {[T_L] = S1, [T_D] = S_F, [T_A] = S_F, [T_O] = S_F, [T_P] = S_F, [T_S] = S_F, [T_Q] = S_F},
+    [S2] = {[T_L] = S_F, [T_D] = S_F, [T_A] = S3, [T_O] = S_E, [T_P] = S_E, [T_S] = S_F, [T_Q] = S_F},
+    [S3] = {[T_L] = S_F, [T_D] = S_F, [T_A] = S_E, [T_O] = S_E, [T_P] = S_E, [T_S] = S_F, [T_Q] = S_F},
+    [S4] = {[T_L] = S_F, [T_D] = S_F, [T_A] = S_E, [T_O] = S5, [T_P] = S_E, [T_S] = S_F, [T_Q] = S_F},
+    [S5] = {[T_L] = S_F, [T_D] = S_F, [T_A] = S_E, [T_O] = S_E, [T_P] = S_E, [T_S] = S_F, [T_Q] = S_F},
+    [S6] = {[T_L] = S_F, [T_D] = S_F, [T_A] = S_E, [T_O] = S_E, [T_P] = S7, [T_S] = S_F, [T_Q] = S_F},
+    [S7] = {[T_L] = S_F, [T_D] = S_F, [T_A] = S_E, [T_O] = S_E, [T_P] = S_E, [T_S] = S_F, [T_Q] = S_F},
+    [S8] = {[T_L] = S8, [T_D] = S8, [T_A] = S8, [T_O] = S8, [T_P] = S8, [T_S] = S_F, [T_Q] = S8},
+    [S9] = {[T_L] = S9, [T_D] = S9, [T_A] = S9, [T_O] = S9, [T_P] = S9, [T_S] = S9, [T_Q] = S_F},
 };
 
 
@@ -104,9 +110,6 @@ char **cmdline_tokens(const char *_cmdline, unsigned int size, int *num_tokens, 
 
     STRINIT(token_buf, token_size);
 
-    bool single_quote = false;
-    bool double_quote = false;
-
     int cur_state = S0;
 
     for (int i = 0; i < size; ++i) {
@@ -116,6 +119,22 @@ char **cmdline_tokens(const char *_cmdline, unsigned int size, int *num_tokens, 
             case '#':
                 if (cur_state == S0) goto end;
                 transition = T_L;
+                break;
+
+            case '\'':
+                transition = T_S;
+                if (cur_state == S8 || cur_state == S0) {
+                    if (cmdline[i + 1] == '\\') i += 2; // safe (see trick at the begining)
+                    else ++i;
+                }
+                break;
+            
+            case '"':
+                transition = T_Q;
+                if (cur_state == S9 || cur_state == S0) {
+                    if (cmdline[i + 1] == '\\') i += 2; // safe (see trick at the begining)
+                    else ++i;
+                }
                 break;
 
             case ' ':
@@ -144,7 +163,7 @@ char **cmdline_tokens(const char *_cmdline, unsigned int size, int *num_tokens, 
         int next_state = fsa[cur_state][transition];
 
         if (next_state == S_F) {
-            printf("%d \"%s\"\n", token_size, token_buf);
+            printf("%d <%s>\n", token_size, token_buf);
             STRRESET(token_buf, token_size);
             cur_state = S0;
             --i;
