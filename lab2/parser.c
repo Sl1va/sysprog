@@ -202,7 +202,7 @@ void free_tokens(char **tokens, int num_tokens) {
     }
 }
 
-// TODO: retrieve OR clause!
+
 struct shell_job *retrieve_jobs(char **_tokens, int num_tokens, int *num_jobs) {
     if (!num_tokens)
         return NULL;
@@ -213,8 +213,8 @@ struct shell_job *retrieve_jobs(char **_tokens, int num_tokens, int *num_jobs) {
         tokens[i] = strdup(_tokens[i]);
     }
 
-    // if job is not bg, then make it fg explicitly
-    if (strcmp(tokens[num_tokens - 1], "&") && strcmp(tokens[num_tokens - 1], "&&")) {
+    // if job is not defined explicitly, make it simple fg
+    if (strcmp(tokens[num_tokens - 1], "&") && strcmp(tokens[num_tokens - 1], "&&") && strcmp(tokens[num_tokens - 1], "||")) {
         tokens = realloc(tokens, sizeof(char *) * (++num_tokens));
         tokens[num_tokens - 1] = strdup("&&");
     }
@@ -227,13 +227,18 @@ struct shell_job *retrieve_jobs(char **_tokens, int num_tokens, int *num_jobs) {
     for (int i = 0; i < num_tokens; ++i) {
         const char *token = tokens[i];
 
-        if (!strcmp(token, "&&") || !strcmp(token, "&")) {
-            bool is_bg = !strcmp(token, "&");
+        if (!strcmp(token, "&&") || !strcmp(token, "&") || !strcmp(token, "||")) {
+            enum job_operator operator = OP_AND;
+
+            if (!strcmp(token, "&"))
+                operator = OP_BG;
+            else if (!strcmp(token, "||"))
+                operator = OP_OR;
 
             struct shell_job job = {
                 .tokens = job_tokens,
                 .num_tokens = job_num_tokens,
-                .bg = is_bg,
+                .operator = operator,
             };
 
             jobs = realloc(jobs, sizeof(struct shell_job) * (++*num_jobs));
@@ -283,7 +288,7 @@ struct cmd *retrieve_cmds(struct shell_job *_job, int *num_cmds) {
     struct shell_job tricked_job = {
         .tokens = _job_tokens,
         .num_tokens = _job_num_tokens,
-        .bg = _job->bg,
+        .operator = _job->operator,
     };
 
     struct shell_job *job = (struct shell_job *) malloc(sizeof(struct shell_job));

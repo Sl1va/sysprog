@@ -1,10 +1,16 @@
 #include "parser.h"
 #include "runner.h"
 
+static const char *JOB_OPERATOR_STR[] = {
+    [OP_AND] = "AND",
+    [OP_OR] = "OR",
+    [OP_BG] = "BG",
+};
+
 int run_job(struct shell_job *job) {
     
     /* DEBUG INFO START */
-    printf("(num_tokens=%d, bg=%d)", job->num_tokens, job->bg);
+    printf("(num_tokens=%d, operator=%s)", job->num_tokens, JOB_OPERATOR_STR[job->operator]);
     for (int j = 0; j < job->num_tokens; ++j) {
         printf(" <%s>", job->tokens[j]);
     }

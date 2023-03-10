@@ -13,10 +13,16 @@ struct cmd {
     bool output_append;
 };
 
+enum job_operator {
+    OP_AND = 0,
+    OP_OR,
+    OP_BG,
+};
+
 struct shell_job {
     char **tokens;
     int num_tokens;
-    bool bg;
+    enum job_operator operator;
 };
 
 char *read_cmdline(const char *invite, FILE *instream, FILE *outstream, unsigned int *size);
