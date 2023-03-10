@@ -88,7 +88,7 @@ int fsa[][7] = {
 };
 
 
-char **cmdline_tokens(const char *_cmdline, unsigned int size, int *num_tokens, int *err) {
+char **cmdline_tokens(const char *_cmdline, unsigned int size, int *num_tokens) {
     // cmdline basic delimeters are spaces and tabs
     // then logical operators (&& and ||) and pipes (|)
     // and bg signature (&)
@@ -100,6 +100,9 @@ char **cmdline_tokens(const char *_cmdline, unsigned int size, int *num_tokens, 
     // backslash (\) is considered as end symbol and 
     // forces not to interpret next symbol anyhow
     // (works even inside quotes)
+
+    *num_tokens = 0;
+    char **tokens = (char **) malloc(sizeof(char*) * (*num_tokens));
 
     // a little trick to make it easier to process clauses
     char *cmdline = strdup(_cmdline);
@@ -163,14 +166,20 @@ char **cmdline_tokens(const char *_cmdline, unsigned int size, int *num_tokens, 
         int next_state = fsa[cur_state][transition];
 
         if (next_state == S_F) {
-            printf("%d <%s>\n", token_size, token_buf);
+            tokens = (char **) realloc(tokens, sizeof(char *) * (++*num_tokens));
+            tokens[*num_tokens - 1] = strdup(token_buf);
             STRRESET(token_buf, token_size);
             cur_state = S0;
             --i;
         } else if (next_state == S_D) {
             cur_state = S0;
         } else if (next_state == S_E) { 
-            printf("Parsing error occured!\n");
+            for (int j = 0; j < *num_tokens; ++j)
+                free(tokens[j]);
+
+            free(tokens);
+            tokens = NULL;
+            
             goto end;
         } else {
             cur_state = next_state;
@@ -182,6 +191,5 @@ end:
     free(token_buf);
     free(cmdline);
 
-    // TODO:
-    return NULL;
+    return tokens;
 }

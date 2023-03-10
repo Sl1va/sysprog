@@ -17,8 +17,26 @@ int main() {
         }
 
         // printf("%d \"%s\"\n", cmdline_size, cmdline);
-        int num_tokens, err;
-        cmdline_tokens(cmdline, cmdline_size, &num_tokens, &err);
+        int num_tokens;
+        char **tokens = cmdline_tokens(cmdline, cmdline_size, &num_tokens);
+        
+        if (!tokens) {
+            printf("Parsing error occured!\n");
+            goto loop_out;
+        }
+
+        printf("%d", num_tokens);
+        for (int i = 0; i < num_tokens; ++i) {
+            printf(" <%s>", tokens[i]);
+        }
+        printf("\n");
+
+        loop_out:
+        if (tokens) {
+            for (int i = 0; i < num_tokens; ++i)
+                free(tokens[i]);
+            free(tokens);
+        }
         free(cmdline);
     }
 }
