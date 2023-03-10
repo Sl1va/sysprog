@@ -202,6 +202,7 @@ void free_tokens(char **tokens, int num_tokens) {
     }
 }
 
+// TODO: retrieve OR clause!
 struct shell_job *retrieve_jobs(char **_tokens, int num_tokens, int *num_jobs) {
     if (!num_tokens)
         return NULL;
@@ -264,4 +265,122 @@ void free_jobs(struct shell_job *jobs, int num_jobs) {
         }
         free(jobs);
     }
+}
+
+struct cmd *retrieve_cmds(struct shell_job *_job, int *num_cmds) {
+    /* "small" trick to prevent expression losing statements */ 
+    int _job_num_tokens = _job->num_tokens;
+    char **_job_tokens = (char**) malloc(sizeof(char*) * _job_num_tokens);
+
+    for (int i = 0; i < _job_num_tokens; ++i)
+        _job_tokens[i] = strdup(_job->tokens[i]);
+
+    if (strcmp(_job_tokens[_job_num_tokens - 1], "|")){
+        _job_tokens = realloc(_job_tokens, sizeof(char *) * (++_job_num_tokens));
+        _job_tokens[_job_num_tokens - 1] = strdup("|");
+    }
+    
+    struct shell_job tricked_job = {
+        .tokens = _job_tokens,
+        .num_tokens = _job_num_tokens,
+        .bg = _job->bg,
+    };
+
+    struct shell_job *job = (struct shell_job *) malloc(sizeof(struct shell_job));
+    memcpy(job, &tricked_job, sizeof(struct shell_job));
+    
+    /* trick end */
+
+    *num_cmds = 0;
+    struct cmd *cmds = (struct cmd *) malloc(sizeof(struct cmd) * (*num_cmds));
+
+    int cmd_len = 0;
+    char **cur_cmd = (char **) malloc(sizeof(char *) * cmd_len);
+
+    char *out_fname = NULL;
+    bool out_append = false;
+
+    for (int i = 0; i < job->num_tokens; ++i) {
+        const char *token = job->tokens[i];
+
+        if (!strcmp(token, ">") || !strcmp(token, ">>")) {
+            if (i == job->num_tokens - 1) {
+                free_cmds(cmds, *num_cmds);
+                *num_cmds = 0;
+                cmds = NULL;
+                goto end;
+            }
+
+            ++i;
+            if (out_fname)
+                free(out_fname);
+            out_fname = strdup(job->tokens[i]);
+
+            if (!strcmp(token, ">>"))
+                out_append = true;
+            else
+                out_append = false;
+
+        } else if (!strcmp(token, "|")) {
+            if (i == 0) {
+                free_cmds(cmds, *num_cmds);
+                *num_cmds = 0;
+                cmds = NULL;
+                goto end;
+            }
+
+            cmds = realloc(cmds, sizeof(struct cmd) * (++*num_cmds));
+            
+            char *_out_fname = NULL;
+            if (out_fname)
+                _out_fname = strdup(out_fname);
+
+            struct cmd cmd_template = {
+                .name = cur_cmd[0],
+                .args = cur_cmd,
+                .argc = cmd_len,
+                .output_fname = _out_fname,
+                .output_append = out_append,
+            };
+
+            memcpy(&cmds[*num_cmds - 1], &cmd_template, sizeof(struct cmd));
+
+            cmd_len = 0;
+            cur_cmd = NULL;
+            free(out_fname);
+            out_fname = NULL;
+            out_append = false;
+
+        } else {
+            cur_cmd = realloc(cur_cmd, sizeof(char *) * (++cmd_len));
+            cur_cmd[cmd_len - 1] = strdup(token);
+        }
+    }
+
+end:
+    for (int i = 0; i < cmd_len; ++i)
+        free(cur_cmd[i]);
+    free(cur_cmd);
+
+    if (out_fname) free(out_fname);
+    
+    free_jobs(job, 1);
+    return cmds;
+}
+
+
+void free_cmds(struct cmd *cmds, int num_cmds) {
+    if (!cmds)
+        return;
+
+    for (int i = 0; i < num_cmds; ++i) {
+        for (int j = 0; j < cmds[i].argc; ++j)
+            free(cmds[i].args[j]);
+        
+        free(cmds[i].args);
+
+        if (cmds[i].output_fname)
+            free(cmds[i].output_fname);
+    }
+    free(cmds);
 }

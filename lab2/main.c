@@ -3,6 +3,7 @@
 #include <stdbool.h>
 
 #include "parser.h"
+#include "runner.h"
 
 int main() {
     bool run = true;
@@ -26,6 +27,8 @@ int main() {
             goto loop_out;
         }
 
+        if (!num_tokens) goto loop_out;
+
         int num_jobs;
         jobs = retrieve_jobs(tokens, num_tokens, &num_jobs);
 
@@ -35,16 +38,12 @@ int main() {
         }
 
         printf("num_jobs=%d\n", num_jobs);
-        for (int i = 0; i < num_jobs; ++i) {
-            const struct shell_job job = jobs[i];
-
-            printf("(job %d, num_tokens=%d, bg=%d)", i, job.num_tokens, job.bg);
-            for (int j = 0; j < job.num_tokens; ++j) {
-                printf(" <%s>", job.tokens[j]);
-            }
-            printf("\n");
-            
-        }
+        for (int i = 0; i < num_jobs; ++i)
+            if (run_job(&jobs[i])) {
+                printf("Failed to run job\n");
+                goto loop_out;
+            }  
+        
 
         loop_out:
 

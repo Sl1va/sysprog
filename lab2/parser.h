@@ -5,9 +5,12 @@
 #include <stdbool.h>
 
 struct cmd {
-    const char *name;
-    const char **args;
+    char *name;
+    char **args;
     int argc;
+
+    char *output_fname;
+    bool output_append;
 };
 
 struct shell_job {
@@ -25,5 +28,9 @@ void free_tokens(char **tokens, int num_tokens);
 struct shell_job *retrieve_jobs(char **tokens, int num_tokens, int *num_jobs);
 
 void free_jobs(struct shell_job *jobs, int num_jobs);
+
+struct cmd *retrieve_cmds(struct shell_job *job, int *num_cmds);
+
+void free_cmds(struct cmd *cmds, int num_cmds);
 
 #endif /* PARSER_H */
