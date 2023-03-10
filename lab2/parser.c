@@ -110,41 +110,68 @@ char **cmdline_tokens(const char *_cmdline, unsigned int size, int *num_tokens, 
     int cur_state = S0;
 
     for (int i = 0; i < size; ++i) {
-        int transition;
-        
-        switch (cmdline[i]) {
-            case '#':
-                if (cur_state == S0) goto end;
-                transition = T_L;
-                break;
+        int transition = T_L;
 
-            case ' ':
-            case '\t':
-                transition = T_D;
-                break;
-            
-            case '&':
-                transition = T_A;
-                break;
-            
-            case '|':
-                transition = T_O;
-                break;
-            
-            case '>':
-                transition = T_P;
-                break;
-            
-            case '\\':
-                ++i;
-            default:
-                transition = T_L;
-        }
+        // if no quotes are involved, process state via transitions
+        if (!single_quote && !double_quote && cmdline[i] != '"' && cmdline[i] != '\'')
+            switch (cmdline[i]) {
+                case '#':
+                    if (cur_state == S0) goto end;
+                    transition = T_L;
+                    break;
+
+                case ' ':
+                case '\t':
+                    transition = T_D;
+                    break;
+
+                case '&':
+                    transition = T_A;
+                    break;
+
+                case '|':
+                    transition = T_O;
+                    break;
+
+                case '>':
+                    transition = T_P;
+                    break;
+
+                case '\\':
+                    ++i;
+                default:
+                    transition = T_L;
+            }
 
         int next_state = fsa[cur_state][transition];
 
+        // process quotes
+        if (!single_quote && !double_quote) {
+            if (cmdline[i] == '\'') {
+                single_quote = true;
+                ++i;
+            }
+            else if (cmdline[i] == '"') {
+                double_quote = true;
+                ++i;
+            }
+        } else if (single_quote && cmdline[i] == '\'') {
+            single_quote = false;
+            next_state = S_F;
+            ++i;
+        } else if (double_quote && cmdline[i] == '"') {
+            double_quote = false;
+            next_state = S_F;
+            ++i;
+        } else next_state = S0;
+
+        if ((double_quote || single_quote) && cmdline[i] == '\\')
+            ++i;
+        
+
+        // process next state
         if (next_state == S_F) {
-            printf("%d \"%s\"\n", token_size, token_buf);
+            printf("%d <%s>\n", token_size, token_buf);
             STRRESET(token_buf, token_size);
             cur_state = S0;
             --i;
