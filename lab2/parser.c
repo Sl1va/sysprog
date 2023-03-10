@@ -193,3 +193,75 @@ end:
 
     return tokens;
 }
+
+void free_tokens(char **tokens, int num_tokens) {
+    if (tokens) {
+        for (int i = 0; i < num_tokens; ++i)
+            free(tokens[i]);
+        free(tokens);
+    }
+}
+
+struct shell_job *retrieve_jobs(char **_tokens, int num_tokens, int *num_jobs) {
+    if (!num_tokens)
+        return NULL;
+    
+    // copy tokens for more flexibility
+    char **tokens = (char **) malloc(sizeof(char *) * num_tokens);
+    for (int i = 0; i < num_tokens; ++i) {
+        tokens[i] = strdup(_tokens[i]);
+    }
+
+    // if job is not bg, then make it fg explicitly
+    if (strcmp(tokens[num_tokens - 1], "&") && strcmp(tokens[num_tokens - 1], "&&")) {
+        tokens = realloc(tokens, sizeof(char *) * (++num_tokens));
+        tokens[num_tokens - 1] = strdup("&&");
+    }
+    
+    *num_jobs = 0;
+    struct shell_job *jobs = (struct shell_job *) malloc(sizeof(struct shell_job) * (*num_jobs));
+
+    int job_num_tokens = 0;
+    char **job_tokens = (char **) malloc(sizeof(char *) * job_num_tokens);
+    for (int i = 0; i < num_tokens; ++i) {
+        const char *token = tokens[i];
+
+        if (!strcmp(token, "&&") || !strcmp(token, "&")) {
+            bool is_bg = !strcmp(token, "&");
+
+            struct shell_job job = {
+                .tokens = job_tokens,
+                .num_tokens = job_num_tokens,
+                .bg = is_bg,
+            };
+
+            jobs = realloc(jobs, sizeof(struct shell_job) * (++*num_jobs));
+            memcpy(&jobs[*num_jobs - 1], &job, sizeof(struct shell_job));
+
+            job_num_tokens = 0;
+            job_tokens = NULL;
+        } else {
+            job_tokens = realloc(job_tokens, sizeof(char *) * (++job_num_tokens));
+            job_tokens[job_num_tokens - 1] = strdup(token);
+        }
+
+    }
+
+    // free not needed allocated memory
+    for (int i = 0; i < num_tokens; ++i)
+        free(tokens[i]);
+    free(tokens);
+
+    return jobs;
+}
+
+void free_jobs(struct shell_job *jobs, int num_jobs) {
+    if (jobs) {
+        for (int i = 0; i < num_jobs; ++i) {
+            for (int j = 0; j < jobs[i].num_tokens; ++j)
+                free(jobs[i].tokens[j]);
+            free(jobs[i].tokens);
+        }
+        free(jobs);
+    }
+}

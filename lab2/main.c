@@ -10,33 +10,46 @@ int main() {
     while (run) {
         unsigned int cmdline_size;
         char *cmdline = read_cmdline("> ", stdin, stdout, &cmdline_size);
+        char **tokens = NULL;
+        struct shell_job *jobs = NULL;
 
         if (!cmdline) {
             run = false;
             continue;
         }
 
-        // printf("%d \"%s\"\n", cmdline_size, cmdline);
         int num_tokens;
-        char **tokens = cmdline_tokens(cmdline, cmdline_size, &num_tokens);
+        tokens = cmdline_tokens(cmdline, cmdline_size, &num_tokens);
         
         if (!tokens) {
             printf("Parsing error occured!\n");
             goto loop_out;
         }
 
-        printf("%d", num_tokens);
-        for (int i = 0; i < num_tokens; ++i) {
-            printf(" <%s>", tokens[i]);
+        int num_jobs;
+        jobs = retrieve_jobs(tokens, num_tokens, &num_jobs);
+
+        if (!jobs) {
+            printf("Error occured while parsing jobs\n");
+            goto loop_out;
         }
-        printf("\n");
+
+        printf("num_jobs=%d\n", num_jobs);
+        for (int i = 0; i < num_jobs; ++i) {
+            const struct shell_job job = jobs[i];
+
+            printf("(job %d, num_tokens=%d, bg=%d)", i, job.num_tokens, job.bg);
+            for (int j = 0; j < job.num_tokens; ++j) {
+                printf(" <%s>", job.tokens[j]);
+            }
+            printf("\n");
+            
+        }
 
         loop_out:
-        if (tokens) {
-            for (int i = 0; i < num_tokens; ++i)
-                free(tokens[i]);
-            free(tokens);
-        }
+
+        free_jobs(jobs, num_jobs);
+        free_tokens(tokens, num_tokens);        
         free(cmdline);
     }
 }
