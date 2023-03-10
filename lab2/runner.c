@@ -7,6 +7,18 @@ static const char *JOB_OPERATOR_STR[] = {
     [OP_BG] = "BG",
 };
 
+int chain_jobs(struct shell_job *jobs, int num_jobs) {
+    printf("num_jobs=%d\n", num_jobs);
+    for (int i = 0; i < num_jobs; ++i) {
+        if (run_job(&jobs[i])) {
+            printf("Failed to run job (%d)\n", i);
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 int run_job(struct shell_job *job) {
     
     /* DEBUG INFO START */

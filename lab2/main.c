@@ -37,13 +37,7 @@ int main() {
             goto loop_out;
         }
 
-        printf("num_jobs=%d\n", num_jobs);
-        for (int i = 0; i < num_jobs; ++i)
-            if (run_job(&jobs[i])) {
-                printf("Failed to run job\n");
-                goto loop_out;
-            }  
-        
+        if (chain_jobs(jobs, num_jobs)) goto loop_out;
 
         loop_out:
 
