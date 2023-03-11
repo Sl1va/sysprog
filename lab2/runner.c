@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <string.h>
 
 #include "parser.h"
 #include "runner.h"
@@ -105,6 +106,12 @@ int run_job(struct shell_job *job) {
         cmds[i].args = realloc(cmds[i].args, sizeof(char *) * (++cmds[i].argc));
         cmds[i].args[cmds[i].argc - 1] = NULL;
 
+        // process builtins
+        if (!strcmp(cmds[i].name, "cd")) {
+            builtin_cd(cmds[i].args, cmds[i].argc);
+            continue;
+        }
+
         int pid = fork();
 
         if (!pid) {
@@ -171,4 +178,12 @@ end:
     free(pids);
     free_cmds(cmds, num_cmds);
     return ret_value;    
+}
+
+int builtin_cd(char **argv, int argc) {
+    if (argc < 2)
+        return 1;
+    
+    chdir(argv[1]);
+    return 0;   
 }

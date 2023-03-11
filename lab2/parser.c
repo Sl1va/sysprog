@@ -39,8 +39,12 @@ char *read_cmdline(const char *invite, FILE *instream, FILE *outstream, unsigned
     fprintf(outstream, "%s", invite);
 
     char c;
-    while (c = fgetc(instream), c != EOF && c != '\n')
-        STRAPPEND(cmdline, c, (*size));
+    char prev = '\0';
+    while (c = fgetc(instream), c != EOF && (c != '\n' || prev == '\\')) {
+        if (c != '\n')
+            STRAPPEND(cmdline, c, (*size));
+        prev = c;
+    }
 
     if (c != EOF)
         return cmdline;
