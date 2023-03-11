@@ -15,39 +15,53 @@ static const char *JOB_OPERATOR_STR[] = {
     [OP_BG] = "BG",
 };
 
-int chain_jobs(struct shell_job *jobs, int num_jobs) {
-    static int job_counter = 0;
+int chain_jobs(struct shell_job *_jobs, int _num_jobs) {
 
-    // printf("num_jobs=%d\n", num_jobs); // DEBUG MESSAGE
-    for (int i = 0; i < num_jobs; ++i) {
+    int num_jobs = 0;
+    struct shell_job *jobs = NULL;
 
-        // run job in background
-        if (jobs[i].operator == OP_BG) {
-            ++job_counter;
+    for (int k = 0; k < _num_jobs; ++k) {
+        jobs = realloc(jobs, sizeof(struct shell_job) * (++num_jobs));
+        jobs[num_jobs - 1] = _jobs[k];
+
+        if (jobs[k].operator == OP_BG) {
+
             int pid = fork();
+
             if (!pid) {
-                setsid(); // make bg proces group leader
-                
-                if (run_job(&jobs[i])) {
-                    printf("[%d] Failed\n", job_counter);
-                    exit(1);
+                setsid(); // make bg proces group leader (to avoid zombies)
+
+                // this buch of jobs is executing in fork
+                for (int i = 0; i < num_jobs; ++i) {
+                    if (run_job(&jobs[i])) {
+                        if (jobs[i].operator != OP_OR) 
+                            exit(1);
+                        else ++i;
+                    } 
                 }
 
-                printf("[%d] Done\n", job_counter);
                 exit(0);
-            } else if (pid > 0) {
-                printf("[%d] Started job with pid %d\n", job_counter, pid);
-            } else {
+            } else if (pid < 0) {
                 printf("chain_jobs: Failed to fork\n");
-                return 1;
+                free(jobs);
+                return 1;   
             }
-        }
 
-        // run job in foreground
-        if (run_job(&jobs[i])) {
-            if (jobs[i].operator == OP_AND) 
-                return 1;
-        } else if (jobs[i].operator == OP_OR) ++i;
+            // clear jobs bunch
+            free(jobs);
+            jobs = NULL;
+            num_jobs = 0; 
+        }
+    }
+
+    if (jobs) {
+        for (int i = 0; i < num_jobs; ++i) {
+            if (run_job(&jobs[i])) {
+                if (jobs[i].operator == OP_AND) 
+                    return 1;
+            } else if (jobs[i].operator == OP_OR) ++i; 
+        }
+        free(jobs);
     }
 
     return 0;
