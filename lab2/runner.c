@@ -185,7 +185,11 @@ int run_job(struct shell_job *job) {
     }
 
     for (int i = 0; i < num_cmds; ++i) {
-        int pid = wait(NULL);
+        int status;
+        int pid = wait(&status);
+        if (status && !ret_value)
+            ret_value = status;
+        
         for (int j = 0; j < num_cmds; ++j){
             if (pid == pids[j]) {
                 // printf("Closing write pipe for %d\n", j);
