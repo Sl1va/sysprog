@@ -3,6 +3,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include "parser.h"
 #include "runner.h"
@@ -127,7 +129,6 @@ int run_job(struct shell_job *job) {
 
             if (i > 0) {    
                 close(STDIN_FILENO);
-                
                 if (dup2(fds[i - 1][0], STDIN_FILENO) == -1) {
                     perror("dup2 stdin");
                     ret_value = 1;
@@ -135,16 +136,40 @@ int run_job(struct shell_job *job) {
                 }
             }
 
-            if (i < num_cmds - 1) {
+            if (cmds[i].output_fname) {
                 close(STDOUT_FILENO);
+                close(fds[i][1]);
+
+                int flags = O_WRONLY | O_CREAT;
+                if (cmds[i].output_append)
+                    flags |= O_APPEND;
+                else
+                    flags |= O_TRUNC;
                 
+                // mode: rw.-rw.-r..
+                int mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH;
+
+                int outfd = open(cmds[i].output_fname, flags, mode);
+
+                if (outfd == -1) {
+                    perror("redirect to file");
+                    ret_value = 1;
+                    goto end;
+                }
+
+                if (dup2(outfd, STDOUT_FILENO) == -1) {
+                    perror("dup2 file redirect");
+                    ret_value = 1;
+                    goto end;
+                }
+            } else if (i < num_cmds - 1) {
+                close(STDOUT_FILENO);
                 if (dup2(fds[i][1], STDOUT_FILENO) == -1) {
                     perror("dup2 stdout");
                     ret_value = 1;
                     goto end;
-                }
+                    }
             }
-
             execvp(cmds[i].name, cmds[i].args);
         } else if (pid > 0) {
             // parent
