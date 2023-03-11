@@ -32,30 +32,6 @@
 #define T_Q 6 /* " */
 
 
-#define STRINIT(str, sz_ident)                                  \
-    do {                                                        \
-        sz_ident = 0;                                           \
-        str = (char *) malloc(sizeof(char) * (sz_ident + 1));   \
-        str[0] = '\0';                                          \
-    } while (0)
-
-
-#define STRAPPEND(str, c, sz)                                   \
-    do {                                                        \
-        ++sz;                                                   \
-        str = (char*) realloc(str, sizeof(char) * (sz + 1));    \
-        str[sz - 1] = c;                                        \
-        str[sz] = '\0';                                         \
-    } while (0)
-
-
-#define STRRESET(str, sz_ident) \
-    do {                        \
-        free(str);              \
-        STRINIT(str, sz_ident); \
-    } while (0)
-
-
 char *read_cmdline(const char *invite, FILE *instream, FILE *outstream, unsigned int *size) {
     char *cmdline;
     STRINIT(cmdline, (*size));
