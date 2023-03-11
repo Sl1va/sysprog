@@ -106,10 +106,8 @@ char **cmdline_tokens(const char *_cmdline, unsigned int size, int *num_tokens) 
 
             case '\'':
                 transition = T_S;
-                if (cur_state == S8 || cur_state == S0) {
-                    if (cmdline[i + 1] == '\\') i += 2; // safe (see trick at the begining)
-                    else ++i;
-                }
+                if (cur_state == S8 || cur_state == S0)
+                    ++i;
                 break;
             
             case '"':
