@@ -46,10 +46,8 @@ int chain_jobs(struct shell_job *jobs, int num_jobs) {
         // run job in foreground
         if (run_job(&jobs[i])) {
             if (jobs[i].operator == OP_AND) 
-                ++i;
-            else 
                 return 1;
-        }
+        } else if (jobs[i].operator == OP_OR) ++i;
     }
 
     return 0;
@@ -168,9 +166,13 @@ int run_job(struct shell_job *job) {
                     perror("dup2 stdout");
                     ret_value = 1;
                     goto end;
-                    }
+                }
             }
             execvp(cmds[i].name, cmds[i].args);
+
+            // execvp failed
+            ret_value = 1;
+            goto end;
         } else if (pid > 0) {
             // parent
             pids[i] = pid;
