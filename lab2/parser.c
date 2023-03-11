@@ -42,9 +42,12 @@ char *read_cmdline(const char *invite, FILE *instream, FILE *outstream, unsigned
     char prev = '\0';
     bool sq = false, dq = false; // quotes
 
-    while (c = fgetc(instream), (c != EOF && (c != '\n' || prev == '\\')) || sq || dq) {
+    while (c = fgetc(instream), c != EOF && (c != '\n' || prev == '\\' || sq || dq)) {
         if (c != '\n' || prev != '\\')
             STRAPPEND(cmdline, c, (*size));
+        
+        if (c == '\n' && prev == '\\')
+            cmdline = realloc(cmdline, sizeof(char *) * (--*size));
         
         if (!sq && !dq) {
             if (c == '\'')
@@ -59,6 +62,7 @@ char *read_cmdline(const char *invite, FILE *instream, FILE *outstream, unsigned
         prev = c;
     }
 
+    // printf("%s\n", cmdline);
     if (c != EOF)
         return cmdline;
     else {
