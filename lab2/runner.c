@@ -64,6 +64,8 @@ int run_job(struct shell_job *job) {
     */
     /* DEBIG INFO STOP */
     int ret_value = 0;
+    int (*fds)[2] = NULL;
+    int *pids;
 
     int num_cmds;
     struct cmd *cmds = retrieve_cmds(job, &num_cmds);
@@ -87,80 +89,86 @@ int run_job(struct shell_job *job) {
     */
     /* DEBIG INFO STOP */
 
-    int input_size;
-    char *input_buf;
-    STRINIT(input_buf, input_size);
+    pids = malloc(sizeof(int) * num_cmds);
+    fds = malloc(sizeof(int[2]) * num_cmds);
+
+    for (int i = 0; i < num_cmds; ++i) {
+        if (pipe(fds[i])) {
+            printf("Failed to initialize pipe\n");
+            ret_value = 1;
+            goto end;
+        }
+    }
 
     for (int i = 0; i < num_cmds; ++i) {
         // terminate args with null-pointer by convention
         cmds[i].args = realloc(cmds[i].args, sizeof(char *) * (++cmds[i].argc));
         cmds[i].args[cmds[i].argc - 1] = NULL;
 
-        int pin_fd[2];
-        int pout_fd[2];
-
-        if (pipe(pin_fd)) {
-            printf("Failed to create pipe");
-            ret_value = 1;
-            goto end;
-        }
-
-        if (pipe(pout_fd)) {
-            printf("Failed to create pipe");
-            ret_value = 1;
-            goto end;
-        }
-
         int pid = fork();
+
         if (!pid) {
-            close(STDIN_FILENO);
-            close(STDOUT_FILENO);
-            close(pin_fd[1]);
-            close(pout_fd[0]);
-            if (dup2(pin_fd[0], STDIN_FILENO) == -1) {
-                perror("dup2 stdin");
-                ret_value = 1;
-                goto end;
+            // child
+            
+            // MUST close not used pipes here
+            for (int j = 0; j < num_cmds; ++j) {
+                if (j != i - 1)
+                    close(fds[j][0]);
+                if (j != i)
+                    close(fds[j][1]);
             }
-            if (dup2(pout_fd[1], STDOUT_FILENO) == -1) {
-                perror("dup2 stdout");
-                ret_value = 1;
-                goto end;
+
+            if (i > 0) {    
+                close(STDIN_FILENO);
+                
+                if (dup2(fds[i - 1][0], STDIN_FILENO) == -1) {
+                    perror("dup2 stdin");
+                    ret_value = 1;
+                    goto end;
+                }
+            }
+
+            if (i < num_cmds - 1) {
+                close(STDOUT_FILENO);
+                
+                if (dup2(fds[i][1], STDOUT_FILENO) == -1) {
+                    perror("dup2 stdout");
+                    ret_value = 1;
+                    goto end;
+                }
             }
 
             execvp(cmds[i].name, cmds[i].args);
         } else if (pid > 0) {
-            close(pin_fd[0]);
-            close(pout_fd[1]);
-
-
-            if (write(pin_fd[1], input_buf, input_size) == -1) {
-                perror("Failed to write to pipe");
-                goto end;
-            }
-            close(pin_fd[1]);
-        
-            STRRESET(input_buf, input_size);
-            char c;
-            while (read(pout_fd[0], &c, sizeof(char)) > 0)
-                STRAPPEND(input_buf, c, input_size);
-            close(pout_fd[0]);
-        
-            wait(NULL);
+            // parent
+            pids[i] = pid;
         } else {
-            printf("run_job: Failed to fork\n");
-            close(pin_fd[0]);
-            close(pout_fd[0]);
-            close(pin_fd[1]);
-            close(pout_fd[1]);
+            // error
+            printf("Failed to fork\n");
             ret_value = 1;
             goto end;
         }
     }
 
-    printf("%s", input_buf);
+    for (int i = 0; i < num_cmds; ++i) {
+        int pid = wait(NULL);
+        for (int j = 0; j < num_cmds; ++j){
+            if (pid == pids[j]) {
+                // printf("Closing write pipe for %d\n", j);
+                close(fds[j][1]);
+                close(fds[j][0]);
+            }
+        }
+    }
 
 end:
+    for (int i = 0; i < num_cmds; ++i) {
+        close(fds[i][0]);
+        close(fds[i][1]);
+    }
+
+    free(fds);
+    free(pids);
     free_cmds(cmds, num_cmds);
     return ret_value;    
 }
