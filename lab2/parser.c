@@ -32,11 +32,9 @@
 #define T_Q 6 /* " */
 
 
-char *read_cmdline(const char *invite, FILE *instream, FILE *outstream, unsigned int *size) {
+char *read_cmdline(FILE *instream, unsigned int *size) {
     char *cmdline;
     STRINIT(cmdline, (*size));
-
-    fprintf(outstream, "%s", invite);
 
     char c;
     char prev = '\0';

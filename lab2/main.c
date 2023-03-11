@@ -10,7 +10,7 @@ int main() {
 
     while (run) {
         unsigned int cmdline_size;
-        char *cmdline = read_cmdline("> ", stdin, stdout, &cmdline_size);
+        char *cmdline = read_cmdline(stdin, &cmdline_size);
         char **tokens = NULL;
         struct shell_job *jobs = NULL;
 

@@ -50,7 +50,7 @@ struct shell_job {
     enum job_operator operator;
 };
 
-char *read_cmdline(const char *invite, FILE *instream, FILE *outstream, unsigned int *size);
+char *read_cmdline(FILE *instream, unsigned int *size);
 
 char **cmdline_tokens(const char *cmdline, unsigned int size, int *num_tokens);
 
