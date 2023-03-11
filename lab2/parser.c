@@ -40,9 +40,22 @@ char *read_cmdline(const char *invite, FILE *instream, FILE *outstream, unsigned
 
     char c;
     char prev = '\0';
-    while (c = fgetc(instream), c != EOF && (c != '\n' || prev == '\\')) {
-        if (c != '\n')
+    bool sq = false, dq = false; // quotes
+
+    while (c = fgetc(instream), (c != EOF && (c != '\n' || prev == '\\')) || sq || dq) {
+        if (c != '\n' || prev != '\\')
             STRAPPEND(cmdline, c, (*size));
+        
+        if (!sq && !dq) {
+            if (c == '\'')
+                sq = true;
+            else if (c == '"')
+                dq = true;
+        } else if (sq && c == '\'')
+            sq = false;
+        else if (dq && c == '"')
+            dq = false;
+
         prev = c;
     }
 
