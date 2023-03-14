@@ -355,7 +355,7 @@ end:
         free(cur_cmd[i]);
     free(cur_cmd);
 
-    if (out_fname) free(out_fname);
+    free(out_fname);
     
     free_jobs(job, 1);
     return cmds;
