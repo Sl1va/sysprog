@@ -124,7 +124,6 @@ int run_job(struct shell_job *job) {
             }
 
             if (i > 0) {    
-                close(STDIN_FILENO);
                 if (dup2(fds[i - 1][0], STDIN_FILENO) == -1) {
                     perror("dup2 stdin");
                     exit(1);
@@ -132,7 +131,6 @@ int run_job(struct shell_job *job) {
             }
 
             if (cmds[i].output_fname) {
-                close(STDOUT_FILENO);
                 close(fds[i][1]);
 
                 int flags = O_WRONLY | O_CREAT;
@@ -156,7 +154,6 @@ int run_job(struct shell_job *job) {
                     exit(1);
                 }
             } else if (i < num_cmds - 1) {
-                close(STDOUT_FILENO);
                 if (dup2(fds[i][1], STDOUT_FILENO) == -1) {
                     perror("dup2 stdout");
                     exit(1);
