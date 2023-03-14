@@ -193,12 +193,15 @@ int run_job(struct shell_job *job) {
         close(fds[term_id][1]);
         close(fds[term_id][0]);
 
+        pids[term_id] = -1;
+
         for (int j = term_id - 1; j >= 0; --j) {
             if (pids[j] == -1) continue;
 
             kill(pids[j], SIGKILL);
             close(fds[j][1]);
             close(fds[j][0]);
+            pids[j] = -1;
         }
 
     }
