@@ -167,10 +167,8 @@ char **cmdline_tokens(const char *_cmdline, unsigned int size, int *num_tokens) 
         } else if (next_state == S_D) {
             cur_state = S0;
         } else if (next_state == S_E) { 
-            for (int j = 0; j < *num_tokens; ++j)
-                free(tokens[j]);
-
-            free(tokens);
+            free_tokens(tokens, *num_tokens);
+            
             tokens = NULL;
             
             goto end;
@@ -246,10 +244,7 @@ struct shell_job *retrieve_jobs(char **_tokens, int num_tokens, int *num_jobs) {
 
     }
 
-    // free not needed allocated memory
-    for (int i = 0; i < num_tokens; ++i)
-        free(tokens[i]);
-    free(tokens);
+    free_tokens(tokens, num_tokens);
 
     return jobs;
 }
