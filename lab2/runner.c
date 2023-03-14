@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <stdio.h>
 
 #include "parser.h"
 #include "runner.h"
@@ -75,6 +76,10 @@ int run_job(struct shell_job *job) {
         ret_value = 1;
         goto end;
     }
+    
+    // handle explicitly if last command of pipe is exit
+    if (!strcmp(cmds[num_cmds - 1].name, "exit"))
+        builtin_exit(cmds[num_cmds - 1].args, cmds[num_cmds - 1].argc);
 
     pids = malloc(sizeof(int) * num_cmds);
     fds = malloc(sizeof(int[2]) * num_cmds);
@@ -111,12 +116,18 @@ int run_job(struct shell_job *job) {
                     close(fds[j][1]);
             }
 
+            if (!strcmp(cmds[i].name, "exit")) {
+                if (i > 0)
+                    close(fds[i - 1][0]);
+                close(fds[i][1]);
+                builtin_exit(cmds[i].args, cmds[i].argc);
+            }
+
             if (i > 0) {    
                 close(STDIN_FILENO);
                 if (dup2(fds[i - 1][0], STDIN_FILENO) == -1) {
                     perror("dup2 stdin");
-                    ret_value = 1;
-                    goto end;
+                    exit(1);
                 }
             }
 
@@ -137,28 +148,24 @@ int run_job(struct shell_job *job) {
 
                 if (outfd == -1) {
                     perror("redirect to file");
-                    ret_value = 1;
-                    goto end;
+                    exit(1);
                 }
 
                 if (dup2(outfd, STDOUT_FILENO) == -1) {
                     perror("dup2 file redirect");
-                    ret_value = 1;
-                    goto end;
+                    exit(1);
                 }
             } else if (i < num_cmds - 1) {
                 close(STDOUT_FILENO);
                 if (dup2(fds[i][1], STDOUT_FILENO) == -1) {
                     perror("dup2 stdout");
-                    ret_value = 1;
-                    goto end;
+                    exit(1);
                 }
             }
             execvp(cmds[i].name, cmds[i].args);
 
             // execvp failed
-            ret_value = 1;
-            goto end;
+            exit(1);
         } else if (pid > 0) {
             // parent
             pids[i] = pid;
@@ -180,7 +187,10 @@ int run_job(struct shell_job *job) {
         for (int j = 0; j < num_cmds; ++j)
             if (pid == pids[j])
                 term_id = j;
-            
+        
+        if (term_id == num_cmds - 1)
+            ret_value = status;
+
         if (term_id == -1) continue;
 
         close(fds[term_id][1]);
@@ -193,6 +203,7 @@ int run_job(struct shell_job *job) {
             close(fds[j][1]);
             close(fds[j][0]);
         }
+
     }
 
 end:
@@ -213,4 +224,15 @@ int builtin_cd(char **argv, int argc) {
     
     chdir(argv[1]);
     return 0;   
+}
+
+int builtin_exit(char **argv, int argc) {
+    if (argc < 2)
+        exit(0);
+
+    int ret_code = 0;
+    sscanf(argv[1], "%d", &ret_code);
+    exit(ret_code);
+    
+    return 0;
 }
