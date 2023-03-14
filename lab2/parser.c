@@ -168,7 +168,7 @@ char **cmdline_tokens(const char *_cmdline, unsigned int size, int *num_tokens) 
             cur_state = S0;
         } else if (next_state == S_E) { 
             free_tokens(tokens, *num_tokens);
-            
+
             tokens = NULL;
             
             goto end;
@@ -226,14 +226,12 @@ struct shell_job *retrieve_jobs(char **_tokens, int num_tokens, int *num_jobs) {
             else if (!strcmp(token, "||"))
                 operator = OP_OR;
 
-            struct shell_job job = {
+            jobs = realloc(jobs, sizeof(struct shell_job) * (++*num_jobs));
+            jobs[*num_jobs - 1] = (struct shell_job) {
                 .tokens = job_tokens,
                 .num_tokens = job_num_tokens,
                 .operator = operator,
             };
-
-            jobs = realloc(jobs, sizeof(struct shell_job) * (++*num_jobs));
-            memcpy(&jobs[*num_jobs - 1], &job, sizeof(struct shell_job));
 
             job_num_tokens = 0;
             job_tokens = NULL;
@@ -273,16 +271,12 @@ struct cmd *retrieve_cmds(struct shell_job *_job, int *num_cmds) {
         _job_tokens[_job_num_tokens - 1] = strdup("|");
     }
     
-    struct shell_job tricked_job = {
+    struct shell_job *job = (struct shell_job *) malloc(sizeof(struct shell_job));
+    *job = (struct shell_job) {
         .tokens = _job_tokens,
         .num_tokens = _job_num_tokens,
         .operator = _job->operator,
     };
-
-    struct shell_job *job = (struct shell_job *) malloc(sizeof(struct shell_job));
-    memcpy(job, &tricked_job, sizeof(struct shell_job));
-    
-    /* trick end */
 
     *num_cmds = 0;
     struct cmd *cmds = (struct cmd *) malloc(sizeof(struct cmd) * (*num_cmds));
@@ -328,15 +322,13 @@ struct cmd *retrieve_cmds(struct shell_job *_job, int *num_cmds) {
             if (out_fname)
                 _out_fname = strdup(out_fname);
 
-            struct cmd cmd_template = {
+            cmds[*num_cmds - 1] = (struct cmd) {
                 .name = cur_cmd[0],
                 .args = cur_cmd,
                 .argc = cmd_len,
                 .output_fname = _out_fname,
                 .output_append = out_append,
             };
-
-            memcpy(&cmds[*num_cmds - 1], &cmd_template, sizeof(struct cmd));
 
             cmd_len = 0;
             cur_cmd = NULL;
