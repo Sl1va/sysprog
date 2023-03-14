@@ -5,6 +5,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <signal.h>
 
 #include "parser.h"
 #include "runner.h"
@@ -175,12 +176,22 @@ int run_job(struct shell_job *job) {
         if (status && !ret_value)
             ret_value = status;
         
-        for (int j = 0; j < num_cmds; ++j){
-            if (pid == pids[j]) {
-                // printf("Closing write pipe for %d\n", j);
-                close(fds[j][1]);
-                close(fds[j][0]);
-            }
+        int term_id = -1;
+        for (int j = 0; j < num_cmds; ++j)
+            if (pid == pids[j])
+                term_id = j;
+            
+        if (term_id == -1) continue;
+
+        close(fds[term_id][1]);
+        close(fds[term_id][0]);
+
+        for (int j = term_id - 1; j >= 0; --j) {
+            if (pids[j] == -1) continue;
+
+            kill(pids[j], SIGKILL);
+            close(fds[j][1]);
+            close(fds[j][0]);
         }
     }
 
