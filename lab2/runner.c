@@ -78,8 +78,8 @@ int run_job(struct shell_job *job) {
     }
     
     // handle explicitly if last command of pipe is exit
-    if (!strcmp(cmds[num_cmds - 1].name, "exit"))
-        builtin_exit(cmds[num_cmds - 1].args, cmds[num_cmds - 1].argc);
+    if (num_cmds == 1 && !strcmp(cmds[0].name, "exit"))
+        builtin_exit(cmds[0].args, cmds[0].argc);
 
     pids = malloc(sizeof(int) * num_cmds);
     fds = malloc(sizeof(int[2]) * num_cmds);
