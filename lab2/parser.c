@@ -54,10 +54,13 @@ char *read_cmdline(FILE *instream, unsigned int *size) {
                 dq = true;
         } else if (sq && c == '\'')
             sq = false;
-        else if (dq && c == '"')
+        else if (dq && c == '"' && prev != '\\')
             dq = false;
 
-        prev = c;
+        if (prev == '\\' && c == '\\')
+            prev = '\0';
+        else
+            prev = c;
     }
 
     // printf("%s\n", cmdline);
@@ -147,6 +150,11 @@ char **cmdline_tokens(const char *_cmdline, unsigned int size, int *num_tokens) 
             case '"':
                 transition = T_DQUOTE;
                 if (cur_state == S9 || cur_state == S0) {
+                    if ((i == 1 && cmdline[i - 1] == '\\') 
+                    || (i > 1 && cmdline[i - 1] == '\\' && cmdline[i - 2] != '\\')) {
+                        transition = T_LET;
+                        break;
+                    }
                     if (cmdline[i + 1] == '\\') i += 2; // safe (see trick at the begining)
                     else ++i;
                 }
@@ -170,7 +178,8 @@ char **cmdline_tokens(const char *_cmdline, unsigned int size, int *num_tokens) 
                 break;
             
             case '\\':
-                ++i;
+                if (cur_state != S9 || cmdline[i + 1] == '\\')
+                    ++i;
             default:
                 transition = T_LET;
         }
