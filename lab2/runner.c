@@ -18,7 +18,16 @@ int chain_jobs(struct shell_job *_jobs, int _num_jobs) {
 
     for (int k = 0; k < _num_jobs; ++k) {
         jobs = realloc(jobs, sizeof(struct shell_job) * (++num_jobs));
-        jobs[num_jobs - 1] = _jobs[k];
+        
+        char **job_tokens = malloc(sizeof(char *) * _jobs[k].num_tokens);
+        for (int j = 0; j < _jobs[k].num_tokens; ++j)
+            job_tokens[j] = strdup(_jobs[k].tokens[j]);
+
+        jobs[num_jobs - 1] = (struct shell_job) {
+            .tokens = job_tokens,
+            .num_tokens = _jobs[k].num_tokens,
+            .operator = _jobs[k].operator,
+        };
 
         if (jobs[k].operator == OP_BG) {
 
@@ -39,12 +48,12 @@ int chain_jobs(struct shell_job *_jobs, int _num_jobs) {
                 exit(0);
             } else if (pid < 0) {
                 printf("chain_jobs: Failed to fork\n");
-                free(jobs);
+                free_jobs(jobs, num_jobs);
                 return 1;   
             }
 
             // clear jobs bunch
-            free(jobs);
+            free_jobs(jobs, num_jobs);
             jobs = NULL;
             num_jobs = 0; 
         }
@@ -53,11 +62,12 @@ int chain_jobs(struct shell_job *_jobs, int _num_jobs) {
     if (jobs) {
         for (int i = 0; i < num_jobs; ++i) {
             if (run_job(&jobs[i])) {
-                if (jobs[i].operator == OP_AND) 
+                if (jobs[i].operator == OP_AND) {
+                    free_jobs(jobs, num_jobs);
                     return 1;
+                }
             } else if (jobs[i].operator == OP_OR) ++i; 
         }
-        free(jobs);
     }
 
     return 0;
