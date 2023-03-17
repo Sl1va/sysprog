@@ -70,6 +70,7 @@ int chain_jobs(struct shell_job *_jobs, int _num_jobs) {
         }
     }
 
+    free_jobs(jobs, num_jobs);
     return 0;
 }
 
