@@ -1,5 +1,7 @@
-all: test.o userfs.o
-	gcc test.o userfs.o
+all: test
+
+test: test.o userfs.o
+	gcc test.o userfs.o -o test
 
 test.o: test.c
 	gcc -c test.c -o test.o -I ../utils
