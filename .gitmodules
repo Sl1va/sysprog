@@ -1,0 +1,4 @@
+[submodule "sysprog"]
+	path = sysprog
+	url = https://github.com/Gerold103/sysprog
+	branch = master
