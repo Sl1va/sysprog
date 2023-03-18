@@ -9,6 +9,13 @@ enum {
 /** Global error code. Set from any function on any error. */
 static enum ufs_error_code ufs_error_code = UFS_ERR_NO_ERR;
 
+#define throw_err(err)          \
+    do {                        \
+        ufs_error_code = err;   \
+        return -1;              \
+    }while(0)
+
+
 struct block {
 	/** Block memory. */
 	char *memory;
@@ -21,6 +28,10 @@ struct block {
 
 	/* PUT HERE OTHER MEMBERS */
 };
+
+#define for_each_block(list, item)  \
+    for (struct block *item = list; item != NULL; item = item->next)
+
 
 struct file {
 	/** Double-linked list of file blocks. */
@@ -43,6 +54,10 @@ struct file {
 
 /** List of all files. */
 static struct file *file_list = NULL;
+
+#define for_each_file(item)  \
+    for (struct file *item = file_list; item != NULL; item = item->next)
+
 
 struct filedesc {
 	struct file *file;
@@ -70,38 +85,40 @@ int
 ufs_open(const char *filename, int flags)
 {
 	/* IMPLEMENT THIS FUNCTION */
-	ufs_error_code = UFS_ERR_NOT_IMPLEMENTED;
-	return -1;
+	throw_err(UFS_ERR_NOT_IMPLEMENTED);
 }
 
 ssize_t
 ufs_write(int fd, const char *buf, size_t size)
 {
 	/* IMPLEMENT THIS FUNCTION */
-	ufs_error_code = UFS_ERR_NOT_IMPLEMENTED;
-	return -1;
+	throw_err(UFS_ERR_NOT_IMPLEMENTED);
 }
 
 ssize_t
 ufs_read(int fd, char *buf, size_t size)
 {
 	/* IMPLEMENT THIS FUNCTION */
-	ufs_error_code = UFS_ERR_NOT_IMPLEMENTED;
-	return -1;
+	throw_err(UFS_ERR_NOT_IMPLEMENTED);
 }
 
 int
 ufs_close(int fd)
 {
 	/* IMPLEMENT THIS FUNCTION */
-	ufs_error_code = UFS_ERR_NOT_IMPLEMENTED;
-	return -1;
+	throw_err(UFS_ERR_NOT_IMPLEMENTED);
 }
 
 int
 ufs_delete(const char *filename)
 {
 	/* IMPLEMENT THIS FUNCTION */
-	ufs_error_code = UFS_ERR_NOT_IMPLEMENTED;
-	return -1;
+	throw_err(UFS_ERR_NOT_IMPLEMENTED);
+}
+
+int
+ufs_resize(int fd, size_t new_size)
+{
+	/* IMPLEMENT THIS FUNCTION */
+	throw_err(UFS_ERR_NOT_IMPLEMENTED);
 }
