@@ -4,10 +4,10 @@ test: test.o userfs.o
 	gcc test.o userfs.o -o test
 
 test.o: test.c
-	gcc -c test.c -o test.o -I ../utils
+	gcc -O0 -ggdb -c test.c -o test.o -I ../utils
 
 userfs.o: userfs.c
-	gcc -c userfs.c -o userfs.o
+	gcc -Wall -O0 -ggdb -c userfs.c -o userfs.o
 
 clean:
 	rm -rf *.o a.out
