@@ -326,7 +326,7 @@ static void remove_file(struct file *f) {
 		free(b->memory);
 		if (b->prev)
 			free(b->prev);
-		
+
 		last_block = b;
 	}
 	free(last_block);
@@ -373,7 +373,7 @@ static struct block *add_block(struct file *f) {
 		f->last_block = new_block;
 	} else {
 		f->last_block->next = new_block;
-		new_block->prev = f->last_block->next;
+		new_block->prev = f->last_block;
 		f->last_block = new_block;
 	}
 
