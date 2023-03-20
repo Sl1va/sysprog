@@ -377,11 +377,12 @@ static void remove_file(struct file *f) {
 	if (f->prev)
 		f->prev->next = f->next;
 	
-	// free file instance itself
-	free(f);
 
 	if (file_list == f)
 		file_list = f->next;
+	
+	// free file instance itself
+	free(f);
 }
 
 static int verify_fd(int fd) {
