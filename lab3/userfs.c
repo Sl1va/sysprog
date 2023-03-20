@@ -107,7 +107,16 @@ ufs_open(const char *filename, int flags)
 	struct file *f = find_file(filename);
 	if (!f && !(flags & UFS_CREATE))
 		throw_err(UFS_ERR_NO_FILE);
-	else if (!f) {
+	
+	// in case of opening file in write mode  we should
+	// recreate file in order to be able to 
+	// overwrite data
+	if (f && (flags & UFS_WRITE_ONLY)) {
+		remove_file(f);
+		f = NULL;
+	}
+
+	if (!f) {
 		// create file here
 		f = (struct file *) malloc(sizeof(struct file));
 		*f = (struct file) {
@@ -259,8 +268,9 @@ ufs_close(int fd)
 
 	// if file descriptor was at the end of the list,
 	// we can decrease list size
-	while (file_descriptors && !file_descriptors[file_descriptor_capacity - 1])
-		--file_descriptor_capacity;
+	while (file_descriptors && file_descriptor_capacity > 0
+							&& !file_descriptors[file_descriptor_capacity - 1])
+		free(file_descriptors[--file_descriptor_capacity]);
 	
 	file_descriptors = realloc(file_descriptors,
 							  sizeof(struct filedesc *) * (file_descriptor_capacity));
@@ -285,14 +295,42 @@ ufs_delete(const char *filename)
 }
 
 int
-ufs_resize(int fd, size_t new_size)
+ufs_resize(int _fd, size_t new_size)
 {
 	int fd_err;
-	if (fd_err = verify_fd(fd), fd_err)
+	if (fd_err = verify_fd(_fd), fd_err)
 		throw_err(fd_err);
 
-	/* IMPLEMENT THIS FUNCTION */
-	throw_err(UFS_ERR_NOT_IMPLEMENTED);
+	if (new_size >= MAX_FILE_SIZE)
+		throw_err(UFS_ERR_NO_MEM);
+
+	struct filedesc *fd = file_descriptors[_fd];
+	struct file *f = fd->file;
+
+	int num_blocks = 0;
+	for_each_block(f->block_list, _) ++num_blocks;
+	
+	while (num_blocks * BLOCK_SIZE < new_size) {
+		add_block(f);
+		++num_blocks;
+	}
+	
+	if (num_blocks)
+		while ((num_blocks - 1) * BLOCK_SIZE > new_size) {
+			if (f->last_block->prev) {
+				struct block *b = f->last_block->prev;
+
+				free(b->next->memory);
+				free(b->next);
+				b->next = NULL;
+
+				f->last_block = b;
+			}
+			--num_blocks;
+		}
+
+	f->size = new_size;
+	return 0;
 }
 
 
