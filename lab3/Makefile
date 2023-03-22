@@ -10,4 +10,4 @@ userfs.o: userfs.c
 	gcc -Wall -O0 -ggdb -c userfs.c -o userfs.o
 
 clean:
-	rm -rf *.o a.out
+	rm -rf *.o test

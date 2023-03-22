@@ -8,7 +8,7 @@
 
 enum {
 	BLOCK_SIZE = 512,
-	MAX_FILE_SIZE = 1024 * 1024 * 1024,
+	MAX_FILE_SIZE = 1024 * 1024 * 100,
 };
 
 /** Global error code. Set from any function on any error. */
@@ -107,14 +107,6 @@ ufs_open(const char *filename, int flags)
 	struct file *f = find_file(filename);
 	if (!f && !(flags & UFS_CREATE))
 		throw_err(UFS_ERR_NO_FILE);
-	
-	// in case of opening file in write mode  we should
-	// recreate file in order to be able to 
-	// overwrite data
-	if (f && (flags & UFS_WRITE_ONLY)) {
-		remove_file(f);
-		f = NULL;
-	}
 
 	if (!f) {
 		// create file here
@@ -161,30 +153,44 @@ ufs_write(int _fd, const char *buf, size_t size)
 	if (!f->last_block)
 		add_block(f);
 
-	struct block *lb = f->last_block;
+	int skip = 0;
+	struct block *b = f->block_list;
+
+	while (fd->offset > (skip + 1) * BLOCK_SIZE) {
+		b = b->next;
+		++skip;
+
+		if (!b)
+			b = add_block(f);
+	}
+
+	size_t block_offset = fd->offset % BLOCK_SIZE;
 	size_t written = 0;
 
 	while (written < size) {
-		if (lb->occupied == BLOCK_SIZE)
-			lb = add_block(f);
+		if (b->occupied == BLOCK_SIZE) {
+			b = (b->next == NULL ? add_block(f) : b->next);
+			block_offset = 0;
+		}
 
-		size_t to_write = BLOCK_SIZE;
+		size_t to_write = BLOCK_SIZE - block_offset;
 
 		// check if data to write is less than block size
 		if (to_write > size - written)
 				to_write = size - written;
 		
-		// check if current block can fit the size
-		if (to_write > BLOCK_SIZE - lb->occupied)
-				to_write = BLOCK_SIZE - lb->occupied;
 
 		if (f->size + to_write > MAX_FILE_SIZE)
 			break;
 
-		memcpy(lb->memory + lb->occupied, buf + written, to_write);
+		memcpy(b->memory + block_offset, buf + written, to_write);
+
+
+		fd->offset += to_write;
+		block_offset += to_write;
 		
-		f->last_block->occupied += to_write;
-		f->size += to_write;
+		b->occupied = b->occupied >  block_offset ? b->occupied : block_offset;
+		f->size = fd->offset > f->size ? fd->offset : f->size;
 		written += to_write;
 	}
 
