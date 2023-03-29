@@ -85,6 +85,8 @@ struct filedesc {
 /* helpful descriptor operations */
 static int push_descriptor(struct filedesc *desc);
 
+static void fix_offset(struct filedesc *desc);
+
 /**
  * An array of file descriptors. When a file descriptor is
  * created, its pointer drops here. When a file descriptor is
@@ -149,6 +151,8 @@ ufs_write(int _fd, const char *buf, size_t size)
 	if (fd->flags & UFS_READ_ONLY)
 		throw_err(UFS_ERR_NO_PERMISSION); 
 	
+	fix_offset(fd); // in case of resize
+
 	struct file *f = fd->file;
 	if (!f->last_block)
 		add_block(f);
@@ -211,7 +215,9 @@ ufs_read(int _fd, char *buf, size_t size)
 
 	if (fd->flags & UFS_WRITE_ONLY)
 		throw_err(UFS_ERR_NO_PERMISSION);
-	
+
+	fix_offset(fd); // in case of resize
+		
 	struct block *cur = fd->file->block_list;
 	if (!cur)
 		return 0;
@@ -336,6 +342,10 @@ ufs_resize(int _fd, size_t new_size)
 		}
 
 	f->size = new_size;
+
+	if (f->last_block)
+		f->last_block->occupied = new_size % BLOCK_SIZE;
+
 	return 0;
 }
 
@@ -452,4 +462,11 @@ end:
 	++file_descriptor_count;
 	file_descriptors[available_fd] = desc;
 	return available_fd;
+}
+
+static void fix_offset(struct filedesc *fd) {
+	int file_offset = fd->file->size;
+
+	if (fd->offset > file_offset)
+		fd->offset = file_offset;
 }
