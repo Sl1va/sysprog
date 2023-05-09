@@ -19,6 +19,7 @@ enum thread_poool_errcode {
 	TPOOL_ERR_TASK_NOT_PUSHED,
 	TPOOL_ERR_TASK_IN_POOL,
 	TPOOL_ERR_NOT_IMPLEMENTED,
+	TPOOL_ERR_TIMEOUT,
 };
 
 /** Thread pool API. */
@@ -109,6 +110,21 @@ thread_task_is_running(const struct thread_task *task);
  */
 int
 thread_task_join(struct thread_task *task, void **result);
+
+/**
+ * Like thread_task_join() but wait no longer than the timeout.
+ * @param task Task to join.
+ * @param timeout Timeout in seconds. 0 means no waiting at all. For an infinite
+ *   timeout pass infinity or DBL_MAX or just something huge.
+ * @param[out] result Pointer to stored result of @a task.
+ *
+ * @retval 0 Success.
+ * @retval != 0 Error code.
+ *     - TPOOL_ERR_TASK_NOT_PUSHED - task is not pushed to a pool.
+ *     - TPOOL_ERR_TIMEOUT - join timed out, nothing is done.
+ */
+int
+thread_task_timed_join(struct thread_task *task, double timeout, void **result);
 
 /**
  * Delete a task, free its memory.
